@@ -8,6 +8,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(GTest REQUIRED)
 
+add_executable(scan_exec "src/main.cpp")
+target_include_directories(scan_exec PRIVATE include/)
+
 set(target scan)
 
 add_library(${target} INTERFACE)
