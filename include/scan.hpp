@@ -11,7 +11,7 @@ namespace details {
 
 template <typename T>
 bool specifier_matches_type(const std::string_view &specifier) {
-    if (specifier == "{}") {
+    if (specifier == "") {
         return true;  // Any type can be parsed with "{}" specifier
     };
     if (std::unsigned_integral<T>) {
@@ -20,7 +20,7 @@ bool specifier_matches_type(const std::string_view &specifier) {
         return specifier == "%d";
     } else if (std::floating_point<T>) {
         return specifier == "%f";
-    } else if (std::same_as<T, std::string> || std::same_as<T, std::string_view>) {
+    } else if (std::same_as<std::decay_t<T>, std::string> || std::same_as<std::decay_t<T>, std::string_view>) {
         return specifier == "%s";
     }
 
@@ -44,22 +44,31 @@ std::optional<scan_error> specifiers_match_types(const details::StringViewVector
 template <typename... Ts, size_t... Indexes>
 details::scan_result<Ts...> scan_impl(const details::StringViewVector &inputs, const details::StringViewVector &formats,
                                       const std::index_sequence<Indexes...> &) {
-    details::scan_result<Ts...> result;
-
-    auto parsing_lambda = [&]<std::size_t Index, typename T>() -> bool {
+    bool has_error = false;
+    details::scan_error err;
+    auto lambda = [&]<std::size_t Index, typename T>() {
+        if(has_error){
+            return T{};
+        }
         auto value_parsing_result = details::parse_value_with_format<T>(inputs[Index], formats[Index]);
         if (value_parsing_result) {
-            std::get<Index>(result.value().values) = std::move(*value_parsing_result);
+            return std::move(*value_parsing_result);
         } else {
-            result = std::unexpected{std::move(value_parsing_result.error())};
+            err = std::move(value_parsing_result.error());
+            has_error = true;
+            return T{};
         }
-
-        return value_parsing_result.has_value();
     };
 
-    (parsing_lambda.template operator()<Indexes, Ts>() && ...);
+    details::scan_result<Ts...> result = details::scan_result<Ts...> {
+        std::tuple<Ts...>{lambda.template operator()<Indexes, Ts>()...}
+    };
 
-    return result;
+    if (has_error){
+        return std::unexpected(std::move(err));
+    } else {
+        return result;
+    }
 }
 
 template <typename... Ts>

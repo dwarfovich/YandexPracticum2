@@ -17,15 +17,15 @@ using StringViewVector = std::vector<std::string_view>;
 
 template <typename T>
 std::expected<T, scan_error> parse_value_with_format(std::string_view, std::string_view) {
-    return std::unexpected{"Unknown type was given"};
+    return std::unexpected{scan_error{"Unknown type was given"}};
 }
 
 template <typename T>
-concept numeric = std::integral<T> || std::floating_point<T>;
+concept numeric = std::integral<std::decay_t<T>> || std::floating_point<std::decay_t<T>>;
 
 template <numeric T>
 std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view) {
-    T value;
+    std::decay_t<T> value;
     auto [ptr, ec] = std::from_chars(input.data(), input.data() + input.size(), value);
     if (ec == std::errc()) {
         return value;
@@ -41,9 +41,9 @@ std::expected<T, scan_error> parse_value_with_format(std::string_view input, std
 }
 
 template <typename T>
-    requires std::same_as<T, std::string>
+    requires std::same_as<std::decay_t<T>, std::string> || std::same_as<std::decay_t<T>, std::string_view>
 std::expected<T, scan_error> parse_value_with_format(std::string_view input, std::string_view) {
-    return std::string{input};
+    return T{input};
 }
 
 // Функция для проверки корректности входных данных и выделения из обеих строк интересующих данных для парсинга
